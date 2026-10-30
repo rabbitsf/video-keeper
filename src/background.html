@@ -1,0 +1,10 @@
+<!doctype html>
+<!-- Firefox background page (Chrome uses background.js as a service worker instead).
+     mux.js must load before background.js because lib/hls-job.js runs HLS jobs in this page. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <script src="vendor/mux.js"></script>
+    <script type="module" src="background.js"></script>
+  </head>
+</html>

@@ -1,0 +1,22 @@
+/* Colour tokens shared by the popup and the welcome page (light and dark). */
+:root {
+  --bg: #ffffff;
+  --fg: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --accent: #2563eb;
+  --accent-fg: #ffffff;
+  --ok: #059669;
+  --err: #dc2626;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1f2937;
+    --fg: #f3f4f6;
+    --muted: #9ca3af;
+    --border: #374151;
+    --accent: #3b82f6;
+  }
+}

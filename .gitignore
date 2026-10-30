@@ -1,0 +1,6 @@
+# AI workflow artifacts — local only, never commit
+docs/
+CLAUDE.md
+
+node_modules/
+dist/

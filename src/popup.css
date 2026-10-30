@@ -1,0 +1,131 @@
+body {
+  width: 360px;
+  margin: 0;
+  padding: 12px;
+  font: 13px/1.4 system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+h1 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+
+.hint,
+.empty {
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.meta.ok {
+  color: var(--ok);
+}
+
+.meta.err {
+  color: var(--err);
+}
+
+button {
+  flex: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.secondary {
+  background: var(--border);
+  color: var(--fg);
+}
+
+select {
+  margin-top: 4px;
+  font: inherit;
+  font-size: 12px;
+  max-width: 100%;
+}
+
+progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 6px;
+  accent-color: var(--accent);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+#ytdlp {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+#ytdlp h2 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.ytdlp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#ytdlp select {
+  margin: 0 0 4px;
+}
+
+.grant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--border);
+}

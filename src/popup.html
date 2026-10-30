@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Video Keeper</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Video Keeper</h1>
+    </header>
+    <p id="grant" class="grant" hidden>
+      Allow access to websites so videos can be detected.
+      <button>Allow</button>
+    </p>
+    <section id="ytdlp" hidden>
+      <h2>▶ YouTube detected</h2>
+      <div class="ytdlp-row">
+        <div class="info">
+          <select id="ytdlp-quality">
+            <option value="best">Best quality (MP4)</option>
+            <option value="1080">Up to 1080p (MP4)</option>
+            <option value="720">Up to 720p (MP4)</option>
+            <option value="audio">Audio only (M4A)</option>
+          </select>
+          <div class="meta"></div>
+          <progress hidden></progress>
+        </div>
+        <button>Download with yt-dlp</button>
+      </div>
+    </section>
+    <p class="hint">Found on this page:</p>
+    <ul id="videos"></ul>
+    <p id="empty" class="empty" hidden>
+      No videos found yet. Try starting playback, then reopen this popup.
+    </p>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

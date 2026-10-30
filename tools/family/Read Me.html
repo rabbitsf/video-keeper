@@ -1,0 +1,76 @@
+<!doctype html>
+<!-- Template: tools/package-family.sh fills in {{VERSION}} and {{XPI}}. Edit here, not in dist/. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Video Keeper — Read Me</title>
+    <style>
+      :root { --fg: #111827; --muted: #6b7280; --bg: #ffffff; --card: #f3f4f6; --accent: #2563eb; }
+      @media (prefers-color-scheme: dark) {
+        :root { --fg: #f3f4f6; --muted: #9ca3af; --bg: #111827; --card: #1f2937; --accent: #60a5fa; }
+      }
+      body { font: 16px/1.55 -apple-system, system-ui, sans-serif; color: var(--fg); background: var(--bg);
+             max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+      h1 { font-size: 26px; margin: 0 0 4px; }
+      h2 { font-size: 19px; margin: 32px 0 8px; }
+      .muted { color: var(--muted); }
+      .card { background: var(--card); border-radius: 10px; padding: 14px 18px; margin: 12px 0; }
+      code, kbd { font: 14px ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--card);
+                  padding: 1px 5px; border-radius: 4px; }
+      ol li { margin: 6px 0; }
+      strong { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <h1>Video Keeper</h1>
+    <p class="muted">Version {{VERSION}} · for Mac</p>
+    <p>Adds a button to your browser that finds videos on the page you're viewing and saves them to your
+      <b>Downloads</b> folder. It can also save YouTube videos once the YouTube helper is set up (part 2).</p>
+
+    <h2>1. Add it to Firefox (1 minute)</h2>
+    <ol>
+      <li>Open <b>Firefox</b>.</li>
+      <li>Drag the file <code>{{XPI}}</code> from this folder onto the Firefox window.</li>
+      <li>Click <b>Add</b>, then <b>OK</b>.</li>
+      <li>Optional: click the puzzle-piece icon in the toolbar and pin <b>Video Keeper</b>.</li>
+    </ol>
+    <div class="card">
+      If the popup shows <b>“Allow access to websites…”</b>, click <b>Allow</b> once — it needs this to see videos on pages.
+    </div>
+
+    <h2>2. Set up YouTube downloads (optional, 5–20 minutes)</h2>
+    <ol>
+      <li>Double-click <code>Install YouTube Helper.command</code>.</li>
+      <li>If macOS says it <i>can't be opened</i> or <i>can't verify the developer</i>: click <b>Done</b>, open
+        <b>System Settings → Privacy &amp; Security</b>, scroll down, click <b>Open Anyway</b> next to
+        “Install YouTube Helper.command”, and confirm with your password.</li>
+      <li>A Terminal window opens and installs everything. When asked for your <b>Mac password</b>, type it and
+        press Return — nothing appears while you type; that's normal.</li>
+      <li>When it says <b>✅ All set</b>, press any key, then <b>quit and reopen Firefox</b>.</li>
+    </ol>
+    <div class="card">
+      Then open a YouTube video, click the Video Keeper button, choose a quality and click
+      <b>Download with yt-dlp</b>. You'll get a notification when it's saved.
+    </div>
+    <p class="muted">After setup you can delete this folder — the helper keeps working.</p>
+
+    <h2>Using Chrome instead?</h2>
+    <p>Chrome can't install it from a file, so it takes a few more steps:</p>
+    <ol>
+      <li>Move the <code>Chrome extension</code> folder somewhere permanent, e.g. your <b>Documents</b> folder
+        (Chrome keeps using it from there).</li>
+      <li>In Chrome, go to <code>chrome://extensions</code> and turn on <b>Developer mode</b> (top right).</li>
+      <li>Click <b>Load unpacked</b> and choose the <code>Chrome extension</code> folder.</li>
+      <li>For YouTube, run part 2 above (it sets up Chrome too), then restart Chrome.</li>
+    </ol>
+
+    <h2>Good to know</h2>
+    <ul>
+      <li>Works on most sites with ordinary videos and streams. It can't save copy-protected video
+        (Netflix, Disney+, Prime Video, etc.) or live streams.</li>
+      <li>Updates don't install automatically — you'll get a new copy of this folder when there is one.</li>
+      <li>Please only download videos you're allowed to: your own, openly licensed ones, or where the site permits it.</li>
+    </ul>
+  </body>
+</html>

@@ -1,0 +1,115 @@
+body {
+  margin: 0;
+  font: 15px/1.55 system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 16px 56px;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+h1 {
+  font-size: 26px;
+  margin: 0;
+}
+
+.lead {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+section {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+  margin: 0 0 6px;
+}
+
+.step {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 14px;
+}
+
+.tag {
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 8px;
+}
+
+p {
+  margin: 6px 0;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.status {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--border);
+}
+
+.status.ok {
+  color: var(--ok);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  font: inherit;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: var(--border);
+  color: var(--fg);
+}
+
+footer {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 24px;
+}
+
+[hidden] {
+  display: none !important;
+}

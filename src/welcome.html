@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Welcome to Video Keeper</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="welcome.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="../icons/icon-128.png" alt="" width="64" height="64" />
+        <div>
+          <h1>Welcome to Video Keeper</h1>
+          <p class="lead">Save videos from the pages you visit as ordinary MP4 files in your Downloads folder.</p>
+        </div>
+      </header>
+
+      <section>
+        <h2><span class="step">1</span> Pin the button</h2>
+        <p>Click the puzzle-piece icon in your browser's toolbar, then the pin next to <b>Video Keeper</b>, so the
+          button is always one click away.</p>
+      </section>
+
+      <section>
+        <h2><span class="step">2</span> Download a video</h2>
+        <p>Open a page with a video and click the Video Keeper button. It lists the videos on that page — click
+          <b>Download</b>. For streaming videos you can pick the quality and watch the progress; you can close the
+          popup while it works.</p>
+        <p class="muted">If nothing shows up, start playing the video and open the popup again. Copy-protected
+          services (Netflix, Disney+, Prime Video and similar) and live streams can't be downloaded.</p>
+      </section>
+
+      <section id="access" hidden>
+        <h2><span class="step">!</span> Allow access to websites</h2>
+        <p>Video Keeper needs permission to see the videos on the pages you visit.</p>
+        <button id="access-button">Allow</button>
+      </section>
+
+      <section>
+        <h2><span class="step">3</span> YouTube downloads <span class="tag">optional</span></h2>
+        <p>YouTube needs the free <b>Video Keeper Helper</b>, a small Mac app that does the download. You install it
+          once; after that it keeps itself up to date.</p>
+        <div class="status" id="helper-status">Checking for Video Keeper Helper…</div>
+        <div class="actions">
+          <button id="helper-install" hidden>Download Video Keeper Helper</button>
+          <button id="helper-recheck" class="secondary" hidden>Check again</button>
+        </div>
+        <p class="muted" id="helper-hint" hidden>After installing, quit and reopen your browser, then click
+          <b>Check again</b>.</p>
+      </section>
+
+      <footer>
+        <p>Only download videos you have the right to: your own, openly licensed ones, or where the website allows
+          it. Video Keeper doesn't collect any data.</p>
+      </footer>
+    </main>
+    <script type="module" src="welcome.js"></script>
+  </body>
+</html>

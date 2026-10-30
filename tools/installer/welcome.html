@@ -1,0 +1,23 @@
+<!doctype html>
+<html>
+  <head><meta charset="utf-8" /></head>
+  <body style="font: 13px -apple-system, sans-serif">
+    <h2>Video Keeper Helper</h2>
+    <p>This adds the YouTube download button to the <b>Video Keeper</b> browser extension for Firefox and Chrome.</p>
+    <p>It installs:</p>
+    <ul>
+      <li>a small helper program the extension talks to, and</li>
+      <li><b>yt-dlp</b>, the open-source tool that downloads the video, with a private copy of
+        <b>Python</b> to run it and <b>QuickJS</b>, a small JavaScript engine YouTube downloads need, and</li>
+      <li>FFmpeg, used to combine a video's picture and sound into one MP4 file.</li>
+    </ul>
+    <p>Everything goes into <code>/Library/Application Support/VideoKeeper</code> and is signed and notarized by Apple.
+      Because websites change often, the helper keeps yt-dlp current by itself: at most once a day it checks
+      yt-dlp's official GitHub releases and, if there is a new version, downloads it into your user folder
+      after verifying its published checksum. No other programs are ever downloaded.</p>
+    <p>Videos are saved to your <b>Downloads</b> folder. The helper collects no data and only runs while the
+      extension is using it.</p>
+    <p>To uninstall later, run in Terminal:<br />
+      <code>sudo "/Library/Application Support/VideoKeeper/uninstall.sh"</code></p>
+  </body>
+</html>
