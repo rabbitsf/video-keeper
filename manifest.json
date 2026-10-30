@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Video Keeper",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Video downloader: find videos and HLS streams on the page you are viewing and save them as MP4.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuLGHkMQkGG913NRbEEAEeXf/hfm9td8GsFR6g4E9D1dE0Oc67RrVAQJnTREQ2/XIehwKDeawChjdwhm/kyWva/tpKRa/1v82W6ubGsAg86dOz5+pnhGeXulFBef8yOYLW/qGegZd9fM2Te1ca/e45N5IMKhUIFmMAkjCEKbAfW+kOxsty82dG/1e/NP13V1N7swVCiTX8UM6dOqnIX5l8SLRh88YvLr6XCE030+kSeaX39DCy3bR9PbNc2jra1bJsj23lXiuIS/jjynShdQK2GaesYGHjBL1ZJZ7494t8DPmZ4OclOoLnyRqgjNKGB3VUNavKomPUb+XsGQT/kM2uQIDAQAB",
   "icons": {
