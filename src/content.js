@@ -1,16 +1,30 @@
 // Content script: scans the page for <video>/<source> elements and links to video files,
 // and reports raw candidates to the background worker, which decides what counts.
 // Guarded so the popup can safely re-inject it into tabs opened before install.
+//
+// When the extension is reloaded or updated, copies already running in open pages lose their
+// connection ("Extension context invalidated"). Such a copy switches itself off, and a newly
+// injected copy takes over from it instead of deferring to it.
 
 (() => {
-  if (window.__videoDownloaderLoaded) {
-    window.__videoDownloaderScan?.();
+  const existing = window.__videoKeeper;
+  if (existing?.alive()) {
+    existing.scan();
     return;
   }
-  window.__videoDownloaderLoaded = true;
+  existing?.stop(); // Left behind by a previous (reloaded or updated) version of the extension.
 
   let lastReport = '';
   let timer = null;
+
+  // sendMessage throws synchronously (not a rejected promise) once the context is invalidated.
+  function alive() {
+    try {
+      return Boolean(chrome.runtime?.id);
+    } catch {
+      return false;
+    }
+  }
 
   function collect() {
     const found = [];
@@ -28,11 +42,19 @@
   }
 
   function scan() {
+    if (!alive()) {
+      stop();
+      return;
+    }
     const videos = collect();
     const report = JSON.stringify(videos);
     if (report === lastReport) return;
     lastReport = report;
-    chrome.runtime.sendMessage({ type: 'pageVideos', pageTitle: document.title, videos }).catch(() => {});
+    try {
+      chrome.runtime.sendMessage({ type: 'pageVideos', pageTitle: document.title, videos }).catch(() => {});
+    } catch {
+      stop();
+    }
   }
 
   function scheduleScan() {
@@ -40,8 +62,16 @@
     timer = setTimeout(scan, 500);
   }
 
-  window.__videoDownloaderScan = scan;
-  new MutationObserver(scheduleScan).observe(document.documentElement, {
+  const observer = new MutationObserver(scheduleScan);
+
+  function stop() {
+    observer.disconnect();
+    document.removeEventListener('loadedmetadata', scheduleScan, true);
+    clearTimeout(timer);
+  }
+
+  window.__videoKeeper = { alive, scan, stop };
+  observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,
