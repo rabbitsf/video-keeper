@@ -129,3 +129,30 @@ progress {
   border-radius: 8px;
   background: var(--border);
 }
+
+#downloads {
+  margin-bottom: 12px;
+}
+
+.downloads-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.downloads-head h2 {
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+
+button.link {
+  background: none;
+  color: var(--accent);
+  padding: 0;
+  font-size: 12px;
+}
+
+/* Keep the page's own videos in view: long download lists scroll on their own. */
+#jobs {
+  max-height: 200px;
+}

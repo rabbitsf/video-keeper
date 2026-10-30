@@ -55,9 +55,19 @@ const inspectedPlaylists = new Map(); // tabId -> Set of playlist URLs already f
 function resetTab(tabId) {
   delete state.tabs[tabId];
   inspectedPlaylists.delete(tabId);
-  for (const [id, job] of Object.entries(state.jobs)) {
-    if (job.tabId === tabId && !ACTIVE_JOB_STATES.includes(job.status)) delete state.jobs[id];
-  }
+}
+
+// Downloads stay listed in the popup (all tabs) until cleared; keep the newest finished ones.
+const MAX_FINISHED_JOBS = 20;
+
+function addJob(job) {
+  return commit(() => {
+    state.jobs[job.id] = job;
+    const finished = Object.values(state.jobs)
+      .filter((j) => !ACTIVE_JOB_STATES.includes(j.status))
+      .sort((a, b) => b.started - a.started);
+    for (const old of finished.slice(MAX_FINISHED_JOBS)) delete state.jobs[old.id];
+  });
 }
 
 // Canonical entry point for every detection source (network, page scan, HLS inspection).
@@ -191,6 +201,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'cancel':
       cancelJob(msg.jobId);
       return;
+    case 'clearFinished':
+      clearFinishedJobs();
+      return;
     case 'helperStatus':
       checkHelper().then(sendResponse);
       return true;
@@ -228,12 +241,57 @@ function handlePageVideos(tabId, msg) {
 async function downloadVideo(video, { variantUrl, quality } = {}) {
   if (video.kind === 'hls') return startHlsJob(video, variantUrl);
   if (video.kind === 'ytdlp') return startYtDlpJob(video, quality);
-  const downloadId = await chrome.downloads.download({
-    url: video.url,
+  return startFileJob(video);
+}
+
+// Plain video files: the browser downloads them; we mirror its progress into a job.
+async function startFileJob(video) {
+  const id = crypto.randomUUID();
+  await addJob({
+    id,
+    kind: 'file',
+    tabId: video.tabId,
+    videoUrl: video.url,
     filename: filenameFor(video),
-    conflictAction: 'uniquify',
+    status: 'starting',
+    bytes: 0,
+    totalBytes: video.size || 0,
+    started: Date.now(),
   });
-  return { downloadId };
+  try {
+    const downloadId = await chrome.downloads.download({ url: video.url, filename: filenameFor(video), conflictAction: 'uniquify' });
+    await updateJob(id, { downloadId, status: 'downloading' });
+    watchFileDownloads();
+    return { jobId: id };
+  } catch (err) {
+    await updateJob(id, { status: 'error', error: err.message });
+    throw err;
+  }
+}
+
+const basename = (path) => path.split(/[\\/]/).pop();
+let fileWatch = null;
+
+// chrome.downloads has no progress event: poll active file downloads once a second.
+function watchFileDownloads() {
+  fileWatch ||= setInterval(async () => {
+    await ready;
+    const active = Object.values(state.jobs).filter((j) => j.kind === 'file' && j.status === 'downloading');
+    if (!active.length) {
+      clearInterval(fileWatch);
+      fileWatch = null;
+      return;
+    }
+    for (const job of active) {
+      const [item] = await chrome.downloads.search({ id: job.downloadId });
+      if (!item || item.state !== 'in_progress') continue;
+      await updateJob(job.id, {
+        bytes: item.bytesReceived,
+        totalBytes: item.totalBytes > 0 ? item.totalBytes : job.totalBytes,
+        ...(item.filename ? { filename: basename(item.filename) } : {}),
+      });
+    }
+  }, 1000);
 }
 
 async function startHlsJob(video, variantUrl) {
@@ -253,9 +311,7 @@ async function startHlsJob(video, variantUrl) {
     bytes: 0,
     started: Date.now(),
   };
-  await commit(() => {
-    state.jobs[id] = job;
-  });
+  await addJob(job);
   if (!(await runHls(job))) {
     await updateJob(id, { status: 'error', error: 'Download worker did not start' });
   }
@@ -278,6 +334,19 @@ chrome.downloads.onChanged.addListener(async ({ id, state: change }) => {
   await ready;
   const job = Object.values(state.jobs).find((j) => j.downloadId === id);
   if (!job) return;
+  if (job.kind === 'file') {
+    const [item] = await chrome.downloads.search({ id });
+    if (change.current === 'complete') {
+      await updateJob(job.id, {
+        status: 'done',
+        bytes: item?.fileSize || item?.bytesReceived || job.bytes,
+        ...(item?.filename ? { filename: basename(item.filename) } : {}),
+      });
+    } else {
+      await updateJob(job.id, item?.error === 'USER_CANCELED' ? { status: 'cancelled' } : { status: 'error', error: item?.error || 'Download failed' });
+    }
+    return;
+  }
   await revokeHlsBlob(job.blobUrl);
   const complete = change.current === 'complete';
   await updateJob(job.id, complete ? { status: 'done' } : { status: 'error', error: 'Saving the file failed' });
@@ -286,8 +355,22 @@ chrome.downloads.onChanged.addListener(async ({ id, state: change }) => {
 });
 
 function cancelJob(jobId) {
-  if (nativePorts.has(jobId)) nativePorts.get(jobId).postMessage({ type: 'cancel' });
-  else cancelHls(jobId);
+  const job = state.jobs[jobId];
+  if (job?.kind === 'file') {
+    if (job.downloadId != null) chrome.downloads.cancel(job.downloadId).catch(() => {});
+  } else if (nativePorts.has(jobId)) {
+    nativePorts.get(jobId).postMessage({ type: 'cancel' });
+  } else {
+    cancelHls(jobId);
+  }
+}
+
+function clearFinishedJobs() {
+  return commit(() => {
+    for (const [id, job] of Object.entries(state.jobs)) {
+      if (!ACTIVE_JOB_STATES.includes(job.status)) delete state.jobs[id];
+    }
+  });
 }
 
 function notifyDone(filename) {
@@ -352,17 +435,15 @@ function checkHelper() {
 
 async function startYtDlpJob(video, quality = 'best') {
   const id = crypto.randomUUID();
-  await commit(() => {
-    state.jobs[id] = {
-      id,
-      kind: 'ytdlp',
-      tabId: video.tabId,
-      videoUrl: video.url,
-      quality,
-      filename: video.pageTitle || '',
-      status: 'starting',
-      started: Date.now(),
-    };
+  await addJob({
+    id,
+    kind: 'ytdlp',
+    tabId: video.tabId,
+    videoUrl: video.url,
+    quality,
+    filename: video.pageTitle || '',
+    status: 'starting',
+    started: Date.now(),
   });
   const port = chrome.runtime.connectNative(NATIVE_HOST);
   nativePorts.set(id, port);

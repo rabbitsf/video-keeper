@@ -14,6 +14,13 @@
       Allow access to websites so videos can be detected.
       <button>Allow</button>
     </p>
+    <section id="downloads" hidden>
+      <div class="downloads-head">
+        <h2>Downloads</h2>
+        <button id="clear-finished" class="link" hidden>Clear finished</button>
+      </div>
+      <ul id="jobs"></ul>
+    </section>
     <section id="ytdlp" hidden>
       <h2>▶ YouTube detected</h2>
       <div class="ytdlp-row">
@@ -25,7 +32,6 @@
             <option value="audio">Audio only (M4A)</option>
           </select>
           <div class="meta"></div>
-          <progress hidden></progress>
         </div>
         <button>Download with yt-dlp</button>
       </div>

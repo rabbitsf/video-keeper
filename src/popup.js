@@ -17,9 +17,12 @@ const empty = document.getElementById('empty');
 const hint = document.querySelector('.hint');
 const ytdlpSection = document.getElementById('ytdlp');
 const ytdlpQuality = document.getElementById('ytdlp-quality');
-const status = new Map(); // url -> { text, cls } for direct downloads started from this popup
+const downloadsSection = document.getElementById('downloads');
+const jobList = document.getElementById('jobs');
+const clearFinished = document.getElementById('clear-finished');
+const status = new Map(); // url -> { text, cls } when starting a download fails
 const selectedVariant = new Map(); // url -> variant url chosen in the quality picker
-let rows = new Map(); // url -> { video, meta, progress, button }
+let rows = new Map(); // url -> { video, meta, button }
 let jobs = {};
 let ytdlpRow = null; // The YouTube section, kept across list re-renders.
 
@@ -76,6 +79,10 @@ function jobText(job) {
     case 'starting':
       return { text: job.message || 'Starting…' };
     case 'downloading':
+      if (job.kind === 'file') {
+        const size = job.totalBytes ? ` of ${formatBytes(job.totalBytes)}` : '';
+        return { text: `Downloading ${formatBytes(job.bytes) || '0 B'}${size}` };
+      }
       if (job.kind === 'ytdlp') {
         const parts = [
           job.percent != null ? `${Math.floor(job.percent)}%` : '',
@@ -118,8 +125,6 @@ function render(videos) {
     name.textContent = filenameFor(withTabContext(video));
     name.title = video.url;
     const meta = document.createElement('div');
-    const progress = document.createElement('progress');
-    progress.hidden = true;
     info.append(name, meta);
 
     if (video.variants?.length > 1) {
@@ -140,12 +145,11 @@ function render(videos) {
       });
       info.append(select);
     }
-    info.append(progress);
 
     const button = document.createElement('button');
     li.append(info, button);
     list.append(li);
-    rows.set(video.url, { video, meta, progress, button });
+    rows.set(video.url, { video, meta, button });
   }
   applyAll();
 }
@@ -154,8 +158,8 @@ function render(videos) {
 function applyStatus(url) {
   const row = rows.get(url);
   if (!row) return;
-  const { video, meta, progress, button } = row;
-  const job = video.kind === 'hls' || video.kind === 'ytdlp' ? latestJobFor(url) : null;
+  const { video, meta, button } = row;
+  const job = latestJobFor(url);
   const active = job && ACTIVE.includes(job.status);
   const blocked = unsupportedReason(video);
   // A missing helper is a next step, not an error: show it in the normal colour.
@@ -163,17 +167,6 @@ function applyStatus(url) {
   const s = job ? jobText(job) : status.get(url) || (blocked ? { text: blocked, cls: blockedCls } : null);
   meta.className = `meta ${s?.cls || ''}`;
   meta.textContent = s?.text || describe(video);
-
-  progress.hidden = !active;
-  if (active && job.total) {
-    progress.max = job.total;
-    progress.value = job.done;
-  } else if (active && job.percent != null && job.status === 'downloading') {
-    progress.max = 100;
-    progress.value = job.percent;
-  } else {
-    progress.removeAttribute('value');
-  }
 
   button.textContent = active ? 'Cancel' : video.kind === 'ytdlp' ? 'Download with yt-dlp' : 'Download';
   button.className = active ? 'secondary' : '';
@@ -187,22 +180,73 @@ function applyStatus(url) {
 }
 
 async function download(video) {
-  const isJob = video.kind === 'hls' || video.kind === 'ytdlp';
-  if (!isJob) status.set(video.url, { text: 'Starting download…' });
-  applyStatus(video.url);
+  status.delete(video.url);
   const result = await chrome.runtime.sendMessage({
     type: 'download',
     video: withTabContext(video),
     options: { variantUrl: selectedVariant.get(video.url), quality: ytdlpQuality.value },
   });
   if (result?.error) status.set(video.url, { text: `Failed: ${result.error}`, cls: 'err' });
-  else if (!isJob) status.set(video.url, { text: 'Download started — see your browser’s downloads', cls: 'ok' });
   applyStatus(video.url);
 }
+
+// Progress for a job: segments (HLS), bytes (files) or percent (yt-dlp); null = indeterminate.
+function jobProgress(job) {
+  if (job.kind === 'hls' && job.total) return { max: job.total, value: job.done };
+  if (job.kind === 'file' && job.totalBytes) return { max: job.totalBytes, value: job.bytes };
+  if (job.kind === 'ytdlp' && job.status === 'downloading' && job.percent != null) return { max: 100, value: job.percent };
+  return null;
+}
+
+// Downloads list: every download from every tab, each with its own status and progress bar.
+function renderJobs() {
+  const all = Object.values(jobs).sort(
+    (a, b) => ACTIVE.includes(b.status) - ACTIVE.includes(a.status) || b.started - a.started,
+  );
+  downloadsSection.hidden = all.length === 0;
+  clearFinished.hidden = !all.some((j) => !ACTIVE.includes(j.status));
+  jobList.replaceChildren(
+    ...all.map((job) => {
+      const active = ACTIVE.includes(job.status);
+      const li = document.createElement('li');
+      const info = document.createElement('div');
+      info.className = 'info';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = job.filename || 'Video';
+      const s = jobText(job);
+      const meta = document.createElement('div');
+      meta.className = `meta ${s.cls || ''}`;
+      meta.textContent = s.text;
+      info.append(name, meta);
+      if (active) {
+        const bar = document.createElement('progress');
+        const p = jobProgress(job);
+        if (p) {
+          bar.max = p.max;
+          bar.value = p.value;
+        }
+        info.append(bar);
+      }
+      li.append(info);
+      if (active) {
+        const cancel = document.createElement('button');
+        cancel.className = 'secondary';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = () => chrome.runtime.sendMessage({ type: 'cancel', jobId: job.id });
+        li.append(cancel);
+      }
+      return li;
+    }),
+  );
+}
+
+clearFinished.addEventListener('click', () => chrome.runtime.sendMessage({ type: 'clearFinished' }));
 
 async function refresh() {
   const stored = await chrome.storage.session.get(['tabs', 'jobs']);
   jobs = stored.jobs || {};
+  renderJobs();
   render(stored.tabs?.[tab.id]?.videos || {});
 }
 
@@ -212,7 +256,10 @@ function applyAll() {
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'session') return;
-  if (changes.jobs) jobs = changes.jobs.newValue || {};
+  if (changes.jobs) {
+    jobs = changes.jobs.newValue || {};
+    renderJobs();
+  }
   // Firefox lists every key written, changed or not, so compare this tab's videos before
   // re-rendering (a re-render would also close an open quality picker mid-download).
   const videos = changes.tabs?.newValue?.[tab.id]?.videos || {};
@@ -239,7 +286,6 @@ async function setupYtDlp() {
   ytdlpRow = {
     video,
     meta: ytdlpSection.querySelector('.meta'),
-    progress: ytdlpSection.querySelector('progress'),
     button: ytdlpSection.querySelector('button'),
   };
   rows.set(tab.url, ytdlpRow);
