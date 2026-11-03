@@ -1,9 +1,10 @@
 # Video Keeper privacy policy
 
-*Last updated: October 30, 2026*
+*Last updated: November 3, 2026*
 
-Video Keeper (the browser extension and the Video Keeper Helper app) **does not collect, store or share any
-personal data**. There are no accounts, analytics, tracking or advertising.
+Video Keeper (the browser extension, including the Chrome Web Store edition, and the optional Video Keeper Helper
+app for Mac) **does not collect, store or share any personal data**. There are no accounts, analytics, tracking or
+advertising.
 
 ## What stays on your computer
 
@@ -17,20 +18,23 @@ Video Keeper only connects to:
 
 - **The website you are downloading from**, to fetch the video or stream you chose — the same requests your browser
   makes when you play it.
-- **GitHub**, from the helper app, at most once a day: to check for a newer
+- **GitHub**, only from the optional helper app (not part of the Chrome Web Store edition), at most once a day: to check for a newer
   [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) and a newer
   [Video Keeper Helper](https://github.com/rabbitsf/video-keeper/releases), and to download them if available. These
   requests contain no information about you or the videos you watch.
 
 ## Permissions
 
-- **Access your data for all websites** — to find the videos on the page you are viewing. Video Keeper only looks at
-  video and stream addresses, links that point to video files, and the page title (to name the saved file). It
-  never reads or sends page content, form data or browsing history.
+- **Access your data for all websites** (site access, web requests, scripting) — to find the videos on the page you
+  are viewing. Video Keeper only looks at video and stream addresses, links that point to video files, and the page
+  title (to name the saved file). It never reads or sends page content, form data or browsing history.
+- **Read your browsing history** (tabs) — only the current tab's address and title, to show the videos found on it
+  and name the saved file. Nothing is stored or sent anywhere.
 - **Download files** — to save videos to your Downloads folder.
-- **Exchange messages with programs other than the browser** — only to talk to Video Keeper Helper, for YouTube
-  downloads.
+- **Storage** — to keep the list of found videos and download progress while the browser is open.
 - **Notifications** — to tell you when a download has finished.
+- **Exchange messages with programs other than the browser** — only in editions that work with the optional Video
+  Keeper Helper app. The Chrome Web Store edition does not request this permission.
 
 ## Contact
 
