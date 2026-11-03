@@ -10,9 +10,10 @@ const SEGMENT_CONTENT_TYPES = ['video/mp2t', 'video/iso.segment'];
 // Anything smaller than this is almost certainly a preview, ad pixel, or fragment.
 export const MIN_VIDEO_BYTES = 100 * 1024;
 
-// Hosts that only serve separate video/audio pieces (unusable on their own); their pages use yt-dlp instead.
+// Hosts that only serve separate video/audio pieces (unusable on their own).
 const PIECE_ONLY_HOSTS = /(^|\.)googlevideo\.com$/i;
 
+// #if youtube
 // Pages handed to the local yt-dlp helper instead of in-browser detection.
 const YTDLP_PAGE_PATTERNS = [
   /^https?:\/\/(www\.|m\.|music\.)?youtube\.com\/(watch\?|shorts\/|live\/)/i,
@@ -22,6 +23,7 @@ const YTDLP_PAGE_PATTERNS = [
 export function isYtDlpPage(url) {
   return typeof url === 'string' && YTDLP_PAGE_PATTERNS.some((re) => re.test(url));
 }
+// #endif
 
 export function extensionOf(url) {
   try {

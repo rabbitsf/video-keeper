@@ -98,6 +98,7 @@ progress {
   display: none !important;
 }
 
+/* #if youtube */
 #ytdlp {
   margin-bottom: 12px;
   padding: 10px;
@@ -119,6 +120,7 @@ progress {
 #ytdlp select {
   margin: 0 0 4px;
 }
+/* #endif */
 
 .grant {
   display: flex;

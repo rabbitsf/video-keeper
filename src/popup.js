@@ -7,16 +7,23 @@ import {
   formatResolution,
   formatDuration,
   extensionOf,
+  // #if youtube
   isYtDlpPage,
+  // #endif
 } from './lib/media.js';
+// #if youtube
 import { describeHelper, HELPER_DOWNLOAD_URL } from './lib/helper.js';
+// #endif
 import { hasSiteAccess, requestSiteAccess } from './lib/permissions.js';
 
 const list = document.getElementById('videos');
 const empty = document.getElementById('empty');
 const hint = document.querySelector('.hint');
+// #if youtube
 const ytdlpSection = document.getElementById('ytdlp');
 const ytdlpQuality = document.getElementById('ytdlp-quality');
+let ytdlpRow = null; // The YouTube section, kept across list re-renders.
+// #endif
 const downloadsSection = document.getElementById('downloads');
 const jobList = document.getElementById('jobs');
 const clearFinished = document.getElementById('clear-finished');
@@ -24,7 +31,6 @@ const status = new Map(); // url -> { text, cls } when starting a download fails
 const selectedVariant = new Map(); // url -> variant url chosen in the quality picker
 let rows = new Map(); // url -> { video, meta, button }
 let jobs = {};
-let ytdlpRow = null; // The YouTube section, kept across list re-renders.
 
 // ?tabId= shows the popup for a specific tab when the page is opened in a tab (used by E2E tests,
 // since Firefox can't open the toolbar popup programmatically).
@@ -39,17 +45,21 @@ function withTabContext(video) {
 }
 
 function unsupportedReason(video) {
+  // #if youtube
   if (video.helperError) return video.helperError;
+  // #endif
   if (video.live) return 'Live stream — not supported';
   if (video.encryption === 'drm') return 'DRM-protected — can’t download';
   return '';
 }
 
 function describe(video) {
+  // #if youtube
   if (video.kind === 'ytdlp') {
     if (video.ytdlpVersion) return `Saves to Downloads via yt-dlp ${video.ytdlpVersion}`;
     return video.helperChecked ? 'Saves to Downloads (yt-dlp is set up on first download)' : 'Checking yt-dlp helper…';
   }
+  // #endif
   if (video.kind === 'hls') {
     const variant = video.variants?.find((v) => v.url === selectedVariant.get(video.url)) || video;
     return [
@@ -83,6 +93,7 @@ function jobText(job) {
         const size = job.totalBytes ? ` of ${formatBytes(job.totalBytes)}` : '';
         return { text: `Downloading ${formatBytes(job.bytes) || '0 B'}${size}` };
       }
+      // #if youtube
       if (job.kind === 'ytdlp') {
         const parts = [
           job.percent != null ? `${Math.floor(job.percent)}%` : '',
@@ -92,6 +103,7 @@ function jobText(job) {
         ];
         return { text: `Downloading ${parts.filter(Boolean).join(' · ')}`.trim() };
       }
+      // #endif
       return {
         text: `Downloading ${job.done}/${job.total || '?'} segments${job.bytes ? ` · ${formatBytes(job.bytes)}` : ''}`,
       };
@@ -110,12 +122,17 @@ function jobText(job) {
 
 function render(videos) {
   list.replaceChildren();
-  rows = new Map(ytdlpRow ? [[ytdlpRow.video.url, ytdlpRow]] : []);
+  rows = new Map();
+  let sectionShown = false; // A row shown outside the list, above it.
+  // #if youtube
+  if (ytdlpRow) rows.set(ytdlpRow.video.url, ytdlpRow);
+  sectionShown = Boolean(ytdlpRow);
+  // #endif
   const items = Object.values(videos).sort(
     (a, b) => (b.kind === 'hls') - (a.kind === 'hls') || (b.size || 0) - (a.size || 0),
   );
-  empty.hidden = items.length > 0 || Boolean(ytdlpRow);
-  hint.hidden = items.length === 0 && Boolean(ytdlpRow);
+  empty.hidden = items.length > 0 || sectionShown;
+  hint.hidden = items.length === 0 && sectionShown;
   for (const video of items) {
     const li = document.createElement('li');
     const info = document.createElement('div');
@@ -162,39 +179,47 @@ function applyStatus(url) {
   const job = latestJobFor(url);
   const active = job && ACTIVE.includes(job.status);
   const blocked = unsupportedReason(video);
+  let blockedCls = 'err';
+  // #if youtube
   // A missing helper is a next step, not an error: show it in the normal colour.
-  const blockedCls = video.helperInstall || video.helperError ? '' : 'err';
+  if (video.helperInstall || video.helperError) blockedCls = '';
+  // #endif
   const s = job ? jobText(job) : status.get(url) || (blocked ? { text: blocked, cls: blockedCls } : null);
   meta.className = `meta ${s?.cls || ''}`;
   meta.textContent = s?.text || describe(video);
 
-  button.textContent = active ? 'Cancel' : video.kind === 'ytdlp' ? 'Download with yt-dlp' : 'Download';
+  button.textContent = active ? 'Cancel' : 'Download';
   button.className = active ? 'secondary' : '';
   button.disabled = Boolean(blocked);
   button.onclick = active ? () => chrome.runtime.sendMessage({ type: 'cancel', jobId: job.id }) : () => download(video);
+  // #if youtube
+  if (video.kind === 'ytdlp' && !active) button.textContent = 'Download with yt-dlp';
   if (video.helperInstall && !active) {
     button.textContent = 'Install helper';
     button.disabled = false;
     button.onclick = () => chrome.tabs.create({ url: HELPER_DOWNLOAD_URL });
   }
+  // #endif
 }
 
 async function download(video) {
   status.delete(video.url);
-  const result = await chrome.runtime.sendMessage({
-    type: 'download',
-    video: withTabContext(video),
-    options: { variantUrl: selectedVariant.get(video.url), quality: ytdlpQuality.value },
-  });
+  const options = { variantUrl: selectedVariant.get(video.url) };
+  // #if youtube
+  options.quality = ytdlpQuality.value;
+  // #endif
+  const result = await chrome.runtime.sendMessage({ type: 'download', video: withTabContext(video), options });
   if (result?.error) status.set(video.url, { text: `Failed: ${result.error}`, cls: 'err' });
   applyStatus(video.url);
 }
 
-// Progress for a job: segments (HLS), bytes (files) or percent (yt-dlp); null = indeterminate.
+// Progress for a job: segments (HLS), bytes (files) or percent; null = indeterminate.
 function jobProgress(job) {
   if (job.kind === 'hls' && job.total) return { max: job.total, value: job.done };
   if (job.kind === 'file' && job.totalBytes) return { max: job.totalBytes, value: job.bytes };
+  // #if youtube
   if (job.kind === 'ytdlp' && job.status === 'downloading' && job.percent != null) return { max: 100, value: job.percent };
+  // #endif
   return null;
 }
 
@@ -278,6 +303,7 @@ async function checkSiteAccess() {
   });
 }
 
+// #if youtube
 // YouTube pages: hand the page URL to Video Keeper Helper (native/swift; native/host.py for family installs).
 async function setupYtDlp() {
   if (!isYtDlpPage(tab.url)) return;
@@ -305,6 +331,7 @@ async function setupYtDlp() {
   }
   applyStatus(tab.url);
 }
+// #endif
 
 // Ensure the content script is present (tabs opened before install don't have it) and rescan.
 chrome.scripting
@@ -312,5 +339,7 @@ chrome.scripting
   .catch(() => {}); // chrome:// pages and the Web Store can't be scripted.
 
 checkSiteAccess();
+// #if youtube
 setupYtDlp();
+// #endif
 refresh();

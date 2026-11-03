@@ -13,11 +13,15 @@ import {
 } from './lib/media.js';
 import { isHlsResource, parsePlaylist, strongerEncryption } from './lib/hls.js';
 import { runHlsJob, cancelHlsJob } from './lib/hls-job.js';
+// #if youtube
 import { helperProblem, describeHelper, compareVersions, MIN_HELPER_RELEASE } from './lib/helper.js';
+// #endif
 
 const MAX_VIDEOS_PER_TAB = 50;
 const ACTIVE_JOB_STATES = ['starting', 'downloading', 'processing', 'saving'];
+// #if youtube
 const NATIVE_HOST = 'com.videodownloader.ytdlp';
+// #endif
 
 const state = { tabs: {}, jobs: {} };
 const ready = chrome.storage.session.get(['tabs', 'jobs']).then((r) => {
@@ -182,7 +186,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 
 chrome.tabs.onRemoved.addListener((tabId) => updateTab(tabId, resetTab));
 
-// First install: show the welcome page (what it does, pinning the button, the YouTube helper).
+// First install: show the welcome page (what it does, pinning the button, site access).
 chrome.runtime.onInstalled.addListener(({ reason }) => {
   if (reason === 'install') chrome.tabs.create({ url: chrome.runtime.getURL('src/welcome.html') });
 });
@@ -204,9 +208,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     case 'clearFinished':
       clearFinishedJobs();
       return;
+    // #if youtube
     case 'helperStatus':
       checkHelper().then(sendResponse);
       return true;
+    // #endif
     case 'jobUpdate':
       updateJob(msg.jobId, msg.patch).then(() => maybeCloseOffscreen());
       return;
@@ -240,7 +246,9 @@ function handlePageVideos(tabId, msg) {
 // Canonical download implementation — every download trigger routes here.
 async function downloadVideo(video, { variantUrl, quality } = {}) {
   if (video.kind === 'hls') return startHlsJob(video, variantUrl);
+  // #if youtube
   if (video.kind === 'ytdlp') return startYtDlpJob(video, quality);
+  // #endif
   return startFileJob(video);
 }
 
@@ -358,8 +366,10 @@ function cancelJob(jobId) {
   const job = state.jobs[jobId];
   if (job?.kind === 'file') {
     if (job.downloadId != null) chrome.downloads.cancel(job.downloadId).catch(() => {});
+    // #if youtube
   } else if (nativePorts.has(jobId)) {
     nativePorts.get(jobId).postMessage({ type: 'cancel' });
+    // #endif
   } else {
     cancelHls(jobId);
   }
@@ -382,6 +392,7 @@ function notifyDone(filename) {
   });
 }
 
+// #if youtube
 // --- yt-dlp helper (native messaging) ----------------------------------------------------
 // One native port per job: the helper process lives exactly as long as the job, and an open
 // port also keeps this service worker alive while yt-dlp runs.
@@ -480,6 +491,7 @@ async function handleHelperMessage(jobId, port, msg) {
   nativePorts.delete(jobId);
   port.disconnect();
 }
+// #endif
 
 // --- Where HLS jobs run -------------------------------------------------------------------
 // Jobs need blob: URLs. Chrome's service worker can't create them, so jobs run in an offscreen

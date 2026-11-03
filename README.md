@@ -61,6 +61,7 @@ Requirements: macOS, Node.js 22+, Xcode command-line tools.
 npm install
 npm test                    # unit tests
 npm run build:firefox       # Firefox build in dist/firefox (Chrome loads the repository root)
+npm run build:chrome-store  # Chrome Web Store build in dist/chrome-store (+ .zip), without YouTube support
 tools/build-installer.sh    # helper .pkg + self-update files (needs Developer ID certificates
                             # and a notarytool profile; --no-notarize for a local build)
 ```

@@ -6,6 +6,7 @@
     "test": "node --test \"test/*.test.js\"",
     "build:firefox": "node tools/build-firefox.mjs",
     "lint:firefox": "npm run build:firefox && web-ext lint --source-dir dist/firefox",
+    "build:chrome-store": "node tools/build-chrome-store.mjs",
     "sign:firefox": "tools/sign-firefox.sh",
     "package:family": "tools/package-family.sh"
   },
