@@ -12,7 +12,7 @@ Video Keeper can't save copy-protected (DRM) video such as Netflix, Disney+ or P
 
 ## Install
 
-**Firefox:** from Firefox Add-ons *(listing coming soon)*.
+**Firefox:** install [Video Keeper from Firefox Add-ons](https://addons.mozilla.org/firefox/addon/video-keeper/).
 
 **Chrome:** the Chrome Web Store doesn't allow YouTube downloaders, so load it yourself: download this repository
 (**Code → Download ZIP**), unzip it somewhere permanent, open `chrome://extensions`, turn on **Developer mode** and
