@@ -4,7 +4,8 @@
 Usage: host-manifest.py chrome|firefox HELPER_PATH OUTPUT_FILE
 
 Single source for the host name and allowed extension IDs, used by native/install.sh (per-user,
-family/Homebrew path) and tools/build-installer.sh (system-wide, signed .pkg).
+family/Homebrew path), tools/build-installer.sh (system-wide, signed .pkg) and
+tools/windows/stage-helper.mjs (Windows: HELPER_PATH is the launcher, relative to the manifest).
 """
 import json
 import sys

@@ -1,0 +1,86 @@
+# Builds the Windows Video Keeper Helper installer and tests it on a real Windows machine:
+# install (per-user, silent) → registry + ping + local HLS download through yt-dlp/ffmpeg → uninstall.
+# The installer is uploaded as a workflow artifact; publishing it to a release is a manual step
+# (see docs: it must go on the release marked "latest", never a separate Windows-only latest).
+name: Windows helper
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - native/host.py
+      - native/host-manifest.py
+      - tools/native-client.mjs
+      - tools/release.conf
+      - tools/fetch-runtime.sh
+      - tools/windows/**
+      - .github/workflows/windows-helper.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch runtime (pinned, checksum-verified)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node tools/windows/fetch-runtime.mjs
+
+      - name: Stage helper
+        run: node tools/windows/stage-helper.mjs
+
+      - name: Build installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          $release = (Get-Content dist/windows-helper/release.txt -Raw).Trim()
+          $hostName = (Get-Content dist/windows-helper/firefox-host.json -Raw | ConvertFrom-Json).name
+          & $iscc /Qp "/DAppVersion=$release" "/DHostName=$hostName" "/DSourceDir=$PWD\dist\windows-helper" "/DOutputDir=$PWD\dist\windows-installer" tools/windows/installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "RELEASE=$release" | Out-File -Append $env:GITHUB_ENV
+          Get-Item dist/windows-installer/*.exe | Format-Table Name, Length
+
+      - name: Install silently (per-user)
+        run: |
+          $p = Start-Process dist/windows-installer/Video-Keeper-Helper-Setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "installer exit code $($p.ExitCode)" }
+
+      - name: Smoke test (registry, ping, local HLS download)
+        run: |
+          $serve = "$env:RUNNER_TEMP\serve"
+          New-Item -ItemType Directory -Force $serve | Out-Null
+          Copy-Item test/fixtures/seg0.ts, test/fixtures/seg1.ts $serve
+          "#EXTM3U`n#EXT-X-VERSION:3`n#EXT-X-TARGETDURATION:2`n#EXT-X-MEDIA-SEQUENCE:0`n#EXTINF:1.0,`nseg0.ts`n#EXTINF:1.0,`nseg1.ts`n#EXT-X-ENDLIST`n" | Set-Content -NoNewline "$serve\stream.m3u8"
+          $server = Start-Process python -ArgumentList '-m','http.server','8799','--bind','127.0.0.1','--directory',$serve -PassThru -WindowStyle Hidden
+          Start-Sleep 2
+          try { node tools/windows/smoke-test.mjs $env:RELEASE http://127.0.0.1:8799/stream.m3u8; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+          finally { Stop-Process $server -ErrorAction SilentlyContinue }
+
+      - name: Uninstall removes files and registration
+        run: |
+          $dir = "$env:LOCALAPPDATA\VideoKeeper\Helper"
+          $p = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "uninstaller exit code $($p.ExitCode)" }
+          Start-Sleep 3  # the uninstaller finishes deleting from a temporary copy
+          if (Test-Path $dir) { throw "$dir still exists" }
+          $hostName = (Get-Content dist/windows-helper/firefox-host.json -Raw | ConvertFrom-Json).name
+          if (Test-Path "HKCU:\Software\Mozilla\NativeMessagingHosts\$hostName") { throw 'registry key still exists' }
+          'ok - uninstalled cleanly'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Video-Keeper-Helper-Setup-${{ env.RELEASE }}
+          path: dist/windows-installer/Video-Keeper-Helper-Setup.exe
+          if-no-files-found: error

@@ -8,6 +8,11 @@ Chrome starts one host process per connectNative() port. Protocol (JSON, length-
 Closing the port (stdin EOF) cancels a running download.
 
 Standard library only; must stay compatible with macOS's /usr/bin/python3 (3.9).
+
+Installed layouts:
+  macOS family/Homebrew (native/install.sh): host.py alone; tools come from Homebrew.
+  Windows (tools/windows/): host.py + release.txt + bin/ (yt-dlp.exe, ffmpeg.exe, qjs.exe) in a
+  per-user folder. The bundled yt-dlp updates itself at most once a day.
 """
 import json
 import os
@@ -18,10 +23,18 @@ import sys
 import threading
 import time
 
+IS_WINDOWS = os.name == "nt"
+
 VERSION = 1
-# Chrome launches hosts with a minimal PATH; add the usual install locations (yt-dlp, ffmpeg, node).
-EXTRA_PATH = ["/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.local/bin")]
-OUTPUT_DIR = os.path.expanduser("~/Downloads")
+HELPER_DIR = os.path.dirname(os.path.abspath(__file__))
+BIN_DIR = os.path.join(HELPER_DIR, "bin")  # Bundled tools (Windows install); searched first.
+RELEASE_FILE = os.path.join(HELPER_DIR, "release.txt")
+UPDATE_STAMP = os.path.join(HELPER_DIR, "ytdlp-update.stamp")
+UPDATE_INTERVAL = 24 * 60 * 60
+# Browsers launch hosts with a minimal PATH; add the usual install locations (yt-dlp, ffmpeg, node).
+EXTRA_PATH = [] if IS_WINDOWS else ["/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.local/bin")]
+# No console windows for yt-dlp/ffmpeg on Windows (the host itself runs without one).
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 OUTPUT_TEMPLATE = "%(title).150B [%(id)s].%(ext)s"
 PROGRESS_INTERVAL = 0.5
 
@@ -34,7 +47,44 @@ QUALITY_ARGS = {
     "audio": ["-f", "ba[ext=m4a]/ba", "-x", "--audio-format", "m4a"],
 }
 
-ENV = dict(os.environ, PATH=os.pathsep.join(EXTRA_PATH + [os.environ.get("PATH", "/usr/bin:/bin")]))
+ENV = dict(
+    os.environ,
+    PATH=os.pathsep.join([BIN_DIR] + EXTRA_PATH + [os.environ.get("PATH", "/usr/bin:/bin")]),
+    PYTHONIOENCODING="utf-8",  # yt-dlp.exe is Python too: UTF-8 titles/paths on Windows consoles.
+)
+
+
+def downloads_dir():
+    """The user's Downloads folder (Windows: the Known Folder, which may be moved, e.g. to OneDrive)."""
+    if IS_WINDOWS:
+        try:
+            import ctypes
+            import uuid
+            from ctypes import wintypes
+
+            folder_id = uuid.UUID("{374DE290-123F-4565-9164-39C4925E467B}")  # FOLDERID_Downloads
+            guid = (ctypes.c_byte * 16).from_buffer_copy(folder_id.bytes_le)
+            result = ctypes.c_wchar_p()
+            shell32 = ctypes.windll.shell32
+            if shell32.SHGetKnownFolderPath(ctypes.byref(guid), 0, None, ctypes.byref(result)) == 0:
+                try:
+                    return result.value
+                finally:
+                    ctypes.windll.ole32.CoTaskMemFree(result)
+        except Exception:  # noqa: BLE001 — fall back to the usual location
+            pass
+    return os.path.join(os.path.expanduser("~"), "Downloads")
+
+
+OUTPUT_DIR = downloads_dir()
+
+
+def helper_release():
+    try:
+        with open(RELEASE_FILE) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
 _write_lock = threading.Lock()
 
 
@@ -59,9 +109,42 @@ def find_ytdlp():
 
 def ytdlp_version(path):
     try:
-        return subprocess.run([path, "--version"], capture_output=True, text=True, timeout=15, env=ENV).stdout.strip()
+        return subprocess.run(
+            [path, "--version"], capture_output=True, text=True, timeout=15, env=ENV, creationflags=NO_WINDOW,
+        ).stdout.strip()
     except Exception:  # noqa: BLE001 — report "unknown" rather than fail the ping
         return ""
+
+
+def js_runtime_args():
+    """yt-dlp needs a JS engine for YouTube; use the bundled QuickJS when there is one."""
+    qjs = shutil.which("qjs", path=BIN_DIR)
+    return ["--js-runtimes", "quickjs:" + qjs] if qjs else []
+
+
+def update_bundled_ytdlp_if_stale(path):
+    """At most once a day, let the bundled yt-dlp update itself (its own verified updater).
+
+    Runs detached so it outlives this host process (which exits when the port closes). A
+    Homebrew-managed yt-dlp is never touched. Any failure just keeps the current copy.
+    """
+    if not path or os.path.dirname(os.path.abspath(path)) != BIN_DIR:
+        return
+    try:
+        if time.time() - os.path.getmtime(UPDATE_STAMP) < UPDATE_INTERVAL:
+            return
+    except OSError:
+        pass
+    try:
+        with open(UPDATE_STAMP, "w"):  # Stamp first: a failing update still waits a day.
+            pass
+        flags = NO_WINDOW | getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        subprocess.Popen(
+            [path, "-U"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            env=ENV, creationflags=flags, start_new_session=not IS_WINDOWS,
+        )
+    except OSError:
+        pass
 
 
 class Job:
@@ -89,13 +172,14 @@ class Job:
             "--print", "before_dl:VDLT %(title)s",
             "--print", "after_move:VDLF %(filepath)s",
             *QUALITY_ARGS[self.quality],
+            *js_runtime_args(),
             "-P", OUTPUT_DIR, "-o", OUTPUT_TEMPLATE,
             "--", self.url,
         ]
         send({"type": "progress", "status": "starting"})
         self.proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-            errors="replace", bufsize=1, env=ENV,
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
+            errors="replace", bufsize=1, env=ENV, creationflags=NO_WINDOW,
         )
         final_path, error, passes, last_sent = None, None, 0, 0.0
         for line in self.proc.stdout:
@@ -161,13 +245,18 @@ def main():
         kind = message.get("type")
         if kind == "ping":
             path = find_ytdlp()
-            send({
+            pong = {
                 "type": "pong",
                 "version": VERSION,
                 "ytdlp": path,
                 "ytdlpVersion": ytdlp_version(path) if path else "",
                 "ffmpeg": bool(shutil.which("ffmpeg", path=ENV["PATH"])),
-            })
+            }
+            release = helper_release()
+            if release:
+                pong["release"] = release
+            send(pong)
+            update_bundled_ytdlp_if_stale(path)
         elif kind == "download" and job is None:
             job = Job(message.get("url", ""), message.get("quality", "best"))
             job.thread.start()

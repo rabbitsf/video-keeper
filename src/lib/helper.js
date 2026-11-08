@@ -1,9 +1,11 @@
-// Video Keeper Helper (the Mac companion app for YouTube downloads): where to get it and what to tell
-// the user about its state. Single source for the popup and the welcome page.
+// Video Keeper Helper (the companion app for YouTube downloads: Mac, and Windows for Firefox): where
+// to get it and what to tell the user about its state. Single source for the popup and the welcome page.
 // HELPER_REPO must match GITHUB_REPO in tools/release.conf (enforced by test/helper.test.js).
 
 export const HELPER_REPO = 'rabbitsf/video-keeper';
 export const HELPER_DOWNLOAD_URL = `https://github.com/${HELPER_REPO}/releases/latest`;
+// The installer file tools/windows/installer.iss builds; it must be on the release marked "latest".
+export const WINDOWS_HELPER_URL = `${HELPER_DOWNLOAD_URL}/download/Video-Keeper-Helper-Setup.exe`;
 // Oldest helper release this extension works with. Newer helpers update themselves, so this only
 // matters for a helper that has been offline for a long time.
 export const MIN_HELPER_RELEASE = '1.1.0';
@@ -24,31 +26,46 @@ export function helperProblem(message = '') {
   return 'error';
 }
 
-// status: the background's helperStatus result; os: chrome.runtime.getPlatformInfo().os.
-// Returns { ready, text, install } — install: offer the "Install helper" download link.
-export function describeHelper(status, os) {
+// Which helper this system can use: 'mac' (any browser), 'windows' (Firefox only — the Windows
+// installer registers the helper for Firefox), or null.
+function helperPlatform(os, browser) {
+  if (os === 'mac') return 'mac';
+  if (os === 'win' && browser === 'firefox') return 'windows';
+  return null;
+}
+
+// Firefox extension pages run on moz-extension:// URLs.
+export function currentBrowser() {
+  return globalThis.location?.protocol === 'moz-extension:' ? 'firefox' : 'chrome';
+}
+
+// status: the background's helperStatus result; os: chrome.runtime.getPlatformInfo().os;
+// browser: 'firefox' | 'chrome' (currentBrowser()).
+// Returns { ready, text, install, url, supported } — install: offer the download link `url`;
+// supported: this system can use the helper (offer "Check again").
+export function describeHelper(status, os, browser) {
+  const platform = helperPlatform(os, browser);
   if (status?.ok) {
-    return { ready: true, install: false, text: `Ready — Video Keeper Helper ${status.release || ''}`.trim() };
+    return { ready: true, install: false, supported: true, text: `Ready — Video Keeper Helper ${status.release || ''}`.trim() };
   }
-  if (os && os !== 'mac') {
-    return { ready: false, install: false, text: 'YouTube downloads need Video Keeper Helper, which is available for Mac only.' };
+  if (!platform) {
+    const text = os === 'win'
+      ? 'On Windows, YouTube downloads work in Firefox with the Video Keeper add-on.'
+      : 'YouTube downloads need Video Keeper Helper, which is available for Mac and Windows (Firefox).';
+    return { ready: false, install: false, supported: false, text };
   }
+  const url = platform === 'windows' ? WINDOWS_HELPER_URL : HELPER_DOWNLOAD_URL;
+  const offer = (text) => ({ ready: false, install: true, supported: true, url, text });
   switch (status?.reason) {
     case 'missing':
-      return {
-        ready: false,
-        install: true,
-        text: 'To download from YouTube, install the free Video Keeper Helper for Mac, then restart your browser.',
-      };
+      return offer(platform === 'windows'
+        ? 'To download from YouTube, install the free Video Keeper Helper for Windows, then restart Firefox.'
+        : 'To download from YouTube, install the free Video Keeper Helper for Mac, then restart your browser.');
     case 'outdated':
-      return { ready: false, install: true, text: `Video Keeper Helper ${status.release} is out of date — please install the latest version.` };
+      return offer(`Video Keeper Helper ${status.release} is out of date — please install the latest version.`);
     case 'misconfigured':
-      return { ready: false, install: true, text: 'Video Keeper Helper needs to be reinstalled for this browser.' };
+      return offer('Video Keeper Helper needs to be reinstalled for this browser.');
     default:
-      return {
-        ready: false,
-        install: true,
-        text: `Video Keeper Helper isn’t responding${status?.error ? ` (${status.error})` : ''}. Try reinstalling it.`,
-      };
+      return offer(`Video Keeper Helper isn’t responding${status?.error ? ` (${status.error})` : ''}. Try reinstalling it.`);
   }
 }

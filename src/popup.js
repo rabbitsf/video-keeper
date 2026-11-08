@@ -12,7 +12,7 @@ import {
   // #endif
 } from './lib/media.js';
 // #if youtube
-import { describeHelper, HELPER_DOWNLOAD_URL } from './lib/helper.js';
+import { describeHelper, currentBrowser } from './lib/helper.js';
 // #endif
 import { hasSiteAccess, requestSiteAccess } from './lib/permissions.js';
 
@@ -197,7 +197,7 @@ function applyStatus(url) {
   if (video.helperInstall && !active) {
     button.textContent = 'Install helper';
     button.disabled = false;
-    button.onclick = () => chrome.tabs.create({ url: HELPER_DOWNLOAD_URL });
+    button.onclick = () => chrome.tabs.create({ url: video.helperUrl });
   }
   // #endif
 }
@@ -304,7 +304,8 @@ async function checkSiteAccess() {
 }
 
 // #if youtube
-// YouTube pages: hand the page URL to Video Keeper Helper (native/swift; native/host.py for family installs).
+// YouTube pages: hand the page URL to Video Keeper Helper (native/swift on Mac; native/host.py for family
+// installs and on Windows).
 async function setupYtDlp() {
   if (!isYtDlpPage(tab.url)) return;
   ytdlpSection.hidden = false;
@@ -320,13 +321,14 @@ async function setupYtDlp() {
     chrome.runtime.sendMessage({ type: 'helperStatus' }),
     chrome.runtime.getPlatformInfo(),
   ]);
-  const state = describeHelper(helper, platform.os);
+  const state = describeHelper(helper, platform.os, currentBrowser());
   video.helperChecked = true;
   if (state.ready) {
     video.ytdlpVersion = helper.ytdlpVersion;
   } else {
     video.helperError = state.text;
     video.helperInstall = state.install;
+    video.helperUrl = state.url;
     ytdlpQuality.hidden = true; // Nothing to choose until the helper works.
   }
   applyStatus(tab.url);
