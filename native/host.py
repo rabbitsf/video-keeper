@@ -17,6 +17,7 @@ Installed layouts:
 import json
 import os
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -160,9 +161,21 @@ class Job:
         self.thread = threading.Thread(target=self.run, daemon=True)
 
     def cancel(self):
+        # Stop yt-dlp with everything it started: yt-dlp.exe runs the real yt-dlp as a child process,
+        # and yt-dlp runs ffmpeg. Stopping only the top process would let the download go on.
         self.cancelled = True
-        if self.proc and self.proc.poll() is None:
-            self.proc.terminate()
+        if not self.proc or self.proc.poll() is not None:
+            return
+        try:
+            if IS_WINDOWS:
+                subprocess.run(
+                    ["taskkill", "/T", "/F", "/PID", str(self.proc.pid)], stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=NO_WINDOW, timeout=15,
+                )
+            else:
+                os.killpg(self.proc.pid, signal.SIGTERM)  # its own process group (start_new_session)
+        except (OSError, subprocess.SubprocessError):
+            self.proc.kill()
 
     def run(self):
         ytdlp = find_ytdlp()
@@ -183,6 +196,7 @@ class Job:
         self.proc = subprocess.Popen(
             cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             encoding="utf-8", errors="replace", bufsize=1, env=ENV, creationflags=NO_WINDOW,
+            start_new_session=not IS_WINDOWS,
         )
         final_path, error, passes, last_sent = None, None, 0, 0.0
         for line in self.proc.stdout:

@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { spawn } from 'node:child_process';
 import { talk as talk_ } from '../tools/native-client.mjs';
 
 const HOST = fileURLToPath(new URL('../native/host.py', import.meta.url));
@@ -27,6 +28,23 @@ else:
     # inherits it hangs at startup while the host is blocked reading it. Reading here would block too.
     sys.stdin.read()
     out = args[args.index("-P") + 1]
+    if "slow" in args[-1] and os.environ.get("FAKE_CHILD") != "1":
+        # Like yt-dlp.exe (a launcher running the real yt-dlp as a child) or yt-dlp running ffmpeg:
+        # the work happens in a child process, so stopping only this process would not stop it.
+        import subprocess
+        sys.exit(subprocess.call([sys.executable] + sys.argv, env=dict(os.environ, FAKE_CHILD="1")))
+    if "slow" in args[-1]:  # keeps "downloading" until it is stopped
+        os.makedirs(out, exist_ok=True)
+        part = os.path.join(out, "Slow video [slow].mp4.part")
+        print("VDLT Slow video", flush=True)
+        import time
+        for i in range(600):
+            with open(part, "ab") as f:
+                f.write(b"x" * 1000)
+            print("VDLP " + json.dumps({"status": "downloading", "downloaded_bytes": i * 1000, "total_bytes": 10 ** 7,
+                                        "filename": part[:-5], "tmpfilename": part}), flush=True)
+            time.sleep(0.1)
+        sys.exit(0)
     os.makedirs(out, exist_ok=True)
     target = os.path.join(out, "Fake video [abc].mp4")
     print("VDLT Fake video", flush=True)
@@ -119,4 +137,38 @@ test('a bundled yt-dlp updates itself at most once a day', async () => {
   fs.utimesSync(stamp, old, old);
   await talk(helper, [{ type: 'ping' }], (m) => m.type === 'pong');
   assert.ok(await waitFor(() => updates() === 2), 'a day later it updates again');
+});
+
+test('cancel stops yt-dlp and removes its partial files', async () => {
+  const helper = makeHelper({ release: '1.3.0' });
+  const child = spawn(PYTHON, [path.join(helper.dir, 'host.py')], { env: { HOME: helper.home, PATH: '/usr/bin:/bin' } });
+  const replies = [];
+  let buffer = Buffer.alloc(0);
+  const send = (message) => {
+    const body = Buffer.from(JSON.stringify(message));
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(body.length);
+    child.stdin.write(Buffer.concat([header, body]));
+  };
+  const finished = new Promise((resolve) => {
+    child.stdout.on('data', (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+      while (buffer.length >= 4 && buffer.length >= 4 + buffer.readUInt32LE(0)) {
+        const message = JSON.parse(buffer.subarray(4, 4 + buffer.readUInt32LE(0)).toString('utf8'));
+        buffer = buffer.subarray(4 + buffer.readUInt32LE(0));
+        replies.push(message);
+        if (message.type === 'progress' && message.bytes > 0 && !replies.cancelSent) {
+          replies.cancelSent = true;
+          send({ type: 'cancel' });
+        }
+        if (['done', 'error', 'cancelled'].includes(message.type)) resolve(message);
+      }
+    });
+  });
+  send({ type: 'download', url: 'https://example.com/slow', quality: 'best' });
+  const result = await Promise.race([finished, new Promise((r) => setTimeout(() => r({ type: 'timeout' }), 15000))]);
+  child.stdin.end();
+  assert.equal(result.type, 'cancelled', JSON.stringify(replies.slice(-3)));
+  const downloads = path.join(helper.home, 'Downloads');
+  assert.deepEqual(fs.existsSync(downloads) ? fs.readdirSync(downloads) : [], []);
 });
