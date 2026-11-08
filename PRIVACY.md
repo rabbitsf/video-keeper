@@ -1,9 +1,9 @@
 # Video Keeper privacy policy
 
-*Last updated: November 3, 2026*
+*Last updated: November 8, 2026*
 
 Video Keeper (the browser extension, including the Chrome Web Store edition, and the optional Video Keeper Helper
-app for Mac) **does not collect, store or share any personal data**. There are no accounts, analytics, tracking or
+app for Mac and Windows) **does not collect, store or share any personal data**. There are no accounts, analytics, tracking or
 advertising.
 
 ## What stays on your computer
@@ -19,7 +19,7 @@ Video Keeper only connects to:
 - **The website you are downloading from**, to fetch the video or stream you chose — the same requests your browser
   makes when you play it.
 - **GitHub**, only from the optional helper app (not part of the Chrome Web Store edition), at most once a day: to check for a newer
-  [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) and a newer
+  [yt-dlp](https://github.com/yt-dlp/yt-dlp/releases) and, on Mac, a newer
   [Video Keeper Helper](https://github.com/rabbitsf/video-keeper/releases), and to download them if available. These
   requests contain no information about you or the videos you watch.
 
