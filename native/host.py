@@ -35,6 +35,8 @@ UPDATE_INTERVAL = 24 * 60 * 60
 EXTRA_PATH = [] if IS_WINDOWS else ["/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.local/bin")]
 # No console windows for yt-dlp/ffmpeg on Windows (the host itself runs without one).
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+# Tools never get our stdin (the browser's message pipe): on Windows a child that inherits it hangs at
+# startup while the main thread is blocked reading it. Always pass stdin=subprocess.DEVNULL.
 OUTPUT_TEMPLATE = "%(title).150B [%(id)s].%(ext)s"
 PROGRESS_INTERVAL = 0.5
 
@@ -110,7 +112,8 @@ def find_ytdlp():
 def ytdlp_version(path):
     try:
         return subprocess.run(
-            [path, "--version"], capture_output=True, text=True, timeout=15, env=ENV, creationflags=NO_WINDOW,
+            [path, "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15, env=ENV,
+            creationflags=NO_WINDOW,
         ).stdout.strip()
     except Exception:  # noqa: BLE001 — report "unknown" rather than fail the ping
         return ""
@@ -178,8 +181,8 @@ class Job:
         ]
         send({"type": "progress", "status": "starting"})
         self.proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", bufsize=1, env=ENV, creationflags=NO_WINDOW,
+            cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            encoding="utf-8", errors="replace", bufsize=1, env=ENV, creationflags=NO_WINDOW,
         )
         final_path, error, passes, last_sent = None, None, 0, 0.0
         for line in self.proc.stdout:

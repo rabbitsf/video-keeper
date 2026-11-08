@@ -23,6 +23,9 @@ if args == ["--version"]:
 elif args == ["-U"]:
     pass
 else:
+    # yt-dlp must not share the host's stdin (the browser's message pipe): on Windows a child that
+    # inherits it hangs at startup while the host is blocked reading it. Reading here would block too.
+    sys.stdin.read()
     out = args[args.index("-P") + 1]
     os.makedirs(out, exist_ok=True)
     target = os.path.join(out, "Fake video [abc].mp4")
