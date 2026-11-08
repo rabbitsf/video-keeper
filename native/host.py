@@ -31,6 +31,7 @@ HELPER_DIR = os.path.dirname(os.path.abspath(__file__))
 BIN_DIR = os.path.join(HELPER_DIR, "bin")  # Bundled tools (Windows install); searched first.
 RELEASE_FILE = os.path.join(HELPER_DIR, "release.txt")
 UPDATE_STAMP = os.path.join(HELPER_DIR, "ytdlp-update.stamp")
+VERSION_CACHE = os.path.join(HELPER_DIR, "ytdlp-version.json")
 UPDATE_INTERVAL = 24 * 60 * 60
 # Browsers launch hosts with a minimal PATH; add the usual install locations (yt-dlp, ffmpeg, node).
 EXTRA_PATH = [] if IS_WINDOWS else ["/opt/homebrew/bin", "/usr/local/bin", os.path.expanduser("~/.local/bin")]
@@ -111,6 +112,31 @@ def find_ytdlp():
 
 
 def ytdlp_version(path):
+    """yt-dlp's version, cached per yt-dlp file: running it takes seconds (yt-dlp.exe unpacks itself
+    first, slower still under emulation on Windows on Arm), and the browser gives up waiting for pong."""
+    try:
+        info = os.stat(path)
+        key = [os.path.abspath(path), info.st_size, info.st_mtime]
+    except OSError:
+        key = None
+    try:
+        with open(VERSION_CACHE) as f:
+            cached = json.load(f)
+        if key and cached.get("key") == key and cached.get("version"):
+            return cached["version"]
+    except (OSError, ValueError, AttributeError):
+        pass
+    version = _run_ytdlp_version(path)
+    if key and version:
+        try:
+            with open(VERSION_CACHE, "w") as f:
+                json.dump({"key": key, "version": version}, f)
+        except OSError:
+            pass
+    return version
+
+
+def _run_ytdlp_version(path):
     try:
         return subprocess.run(
             [path, "--version"], stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=15, env=ENV,

@@ -172,3 +172,17 @@ test('cancel stops yt-dlp and removes its partial files', async () => {
   const downloads = path.join(helper.home, 'Downloads');
   assert.deepEqual(fs.existsSync(downloads) ? fs.readdirSync(downloads) : [], []);
 });
+
+test('ping reuses the cached yt-dlp version until yt-dlp changes', async () => {
+  const helper = makeHelper({ release: '1.3.0' });
+  fs.writeFileSync(path.join(helper.dir, 'ytdlp-update.stamp'), ''); // no self-update during this test
+  const versionCalls = () => calls(helper.home).filter((a) => a[0] === '--version').length;
+  const ping = async () => (await talk(helper, [{ type: 'ping' }], (m) => m.type === 'pong'))[0];
+  assert.equal((await ping()).ytdlpVersion, '2099.01.01');
+  assert.equal((await ping()).ytdlpVersion, '2099.01.01');
+  assert.equal(versionCalls(), 1, 'second ping uses the cache');
+  const ytdlp = path.join(helper.dir, 'bin', 'yt-dlp');
+  fs.appendFileSync(ytdlp, '# updated\n'); // yt-dlp replaced (e.g. by its self-update)
+  assert.equal((await ping()).ytdlpVersion, '2099.01.01');
+  assert.equal(versionCalls(), 2, 'a changed yt-dlp is asked again');
+});

@@ -418,7 +418,8 @@ function checkHelper() {
       port?.disconnect();
       resolve(result);
     };
-    const timer = setTimeout(() => finish({ ok: false, reason: 'error', error: 'no response' }), 5000);
+    // Generous: a first start can take several seconds (Windows on Arm emulation, antivirus scans).
+    const timer = setTimeout(() => finish({ ok: false, reason: 'error', error: 'no response' }), 20000);
     try {
       port = chrome.runtime.connectNative(NATIVE_HOST);
     } catch (err) {
