@@ -65,6 +65,21 @@ jobs:
           "#EXTM3U`n#EXT-X-VERSION:3`n#EXT-X-TARGETDURATION:2`n#EXT-X-MEDIA-SEQUENCE:0`n#EXTINF:1.0,`nseg0.ts`n#EXTINF:1.0,`nseg1.ts`n#EXT-X-ENDLIST`n" | Set-Content -NoNewline "$serve\stream.m3u8"
           $server = Start-Process python -ArgumentList '-m','http.server','8799','--bind','127.0.0.1','--directory',$serve -PassThru -WindowStyle Hidden
           Start-Sleep 2
+          # Diagnostics (temporary): server reachable? yt-dlp directly, then with a parallel self-update.
+          $yt = "$env:LOCALAPPDATA\VideoKeeper\Helper\bin\yt-dlp.exe"
+          (Invoke-WebRequest http://127.0.0.1:8799/stream.m3u8 -UseBasicParsing).StatusCode
+          $env:PATH = "$env:LOCALAPPDATA\VideoKeeper\Helper\bin;$env:PATH"
+          $d = Start-Process $yt -ArgumentList '-v','--no-playlist','-P',"$env:RUNNER_TEMP\dl1",'http://127.0.0.1:8799/stream.m3u8' -NoNewWindow -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\dl1.txt" -RedirectStandardError "$env:RUNNER_TEMP\dl1.err"
+          if (-not $d.WaitForExit(120000)) { 'DIRECT RUN HUNG'; Stop-Process $d }
+          Get-Content "$env:RUNNER_TEMP\dl1.txt", "$env:RUNNER_TEMP\dl1.err" | Select-Object -Last 40
+          $u = Start-Process $yt -ArgumentList '-U' -NoNewWindow -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\up.txt" -RedirectStandardError "$env:RUNNER_TEMP\up.err"
+          Start-Sleep -Milliseconds 300
+          $d = Start-Process $yt -ArgumentList '-v','--no-playlist','-P',"$env:RUNNER_TEMP\dl2",'http://127.0.0.1:8799/stream.m3u8' -NoNewWindow -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\dl2.txt" -RedirectStandardError "$env:RUNNER_TEMP\dl2.err"
+          if (-not $d.WaitForExit(120000)) { 'RUN DURING UPDATE HUNG'; Stop-Process $d }
+          $u.WaitForExit(120000) | Out-Null
+          '--- update:'; Get-Content "$env:RUNNER_TEMP\up.txt", "$env:RUNNER_TEMP\up.err"
+          '--- run during update:'; Get-Content "$env:RUNNER_TEMP\dl2.txt", "$env:RUNNER_TEMP\dl2.err" | Select-Object -Last 40
+          Get-ChildItem "$env:LOCALAPPDATA\VideoKeeper\Helper\bin" | Format-Table Name, Length, LastWriteTime
           try { node tools/windows/smoke-test.mjs $env:RELEASE http://127.0.0.1:8799/stream.m3u8; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
           finally { Stop-Process $server -ErrorAction SilentlyContinue }
 
